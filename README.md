@@ -132,4 +132,5 @@ The next thing the code does is calculate a regression model and output it as a 
 </table>
 
 And finally there is a visualization of the regression.
-![vanacies unemployment regression](https://github.com/user-attachments/assets/26b55d97-43b4-4767-92ac-0e9b2f6ee741)
+![vanacies unemployment regression](https://github.com/user-attachments/assets/a0df0530-ff80-4ab3-a002-29dbe4fe540b)
+
