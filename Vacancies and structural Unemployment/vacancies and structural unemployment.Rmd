@@ -1,0 +1,262 @@
+---
+title: "**Vacancies and Structural Unemployment**"
+subtitle: "An analysis of unemployment and vacancies in Germany"
+author: |
+        | Christopher Berberich
+        |
+        | © The Author 2024
+date: "`29 - 07 - 2024`"
+output: pdf_document
+linestretch: 1.5
+geometry: left=3.2cm,right=3.2cm,top=2.8cm,bottom=2.8cm
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+```
+
+# Introduction
+
+In Germany we have a lot discussions about labour shortage and unemployed people how allegedly do not want to work. But how is it really? I will give you here some instructions and R code to analys the relationship between unemployment and job vacancies between. The data on job vacancies come from the Institut für Arbeitsmarkt - und Berufsforschung (IAB), and the data on the number of unemployed people come from the official unemployment statistics of the Bundesagentur für Arbeit.
+
+First, the necessary libraries are loaded and the data is prepared for further processing.
+
+```{r library and data}
+# All packages installed?
+# install.packages("readxl")
+# install.packages("tidyverse")
+# install.packages("gt")
+# install.packages("stargazer")
+
+library(readxl)
+library(tidyverse)
+library(gt)
+library(stargazer)
+###### Don`t forgett to set your working directory. replace "\" in your path with "/".
+setwd("Your directory path /Vacancies and structural Unemployment")
+
+# link to the data about vacancies: https://www.iab.de/stellenerhebung/download
+vacancies <- read_excel("datasets/IAB-Stellenerhebung_Indikatoren.xlsx", sheet = "2")
+# link to official unemployment statistics: https://www.destatis.de/static/de_/opendata/data/arbeitslose_deutschland_originalwert.csv
+unemployed <- read.csv("datasets/arbeitslose_deutschland_originalwert.csv", skip = 2, header = TRUE, sep = ";") 
+
+# Let´s prepare the data 
+cn <- c("year", "quarter", "immediately", "West", "East", "later", "West2", "East2")
+
+colnames(vacancies) <- cn
+vacancies <- select(vacancies, year, quarter, immediately)
+vacancies <- vacancies[-(1:11), ]
+
+# Remove the asterisks that appear at the end of some years
+vacancies$year <- str_remove(vacancies$year, "\\*$")
+
+#It did not work with a single asterisk and I don´t know why. However, I simply replace the value manually.
+
+vacancies[41, "year"] <- "2020"
+
+# Don´t like separation of "year" and "quarter"? Let´s build a function that gives the date based on this variables back :)
+get_date <-  function(year, quarter) {
+  month <- (quarter - 1) * 3 + 1
+  date <- as.Date(paste(year, month, "01", sep = "-"), format = "%Y-%m-%d")
+}
+
+vacancies$immediately<- as.numeric(vacancies$immediately)
+vacancies$quarter <- as.numeric(vacancies$quarter)
+vacancies$date <- get_date(vacancies$year, vacancies$quarter)
+vacancies <- select(vacancies, date, immediately)
+vacancies$immediately <- round(vacancies$immediately, 1)
+
+cn2 <- c("date", "total", "men", "women", "youth", "longtime")
+colnames(unemployed) <- cn2
+unemployed$date <- as.Date(unemployed$date, format= "%d/%m/%Y")
+
+# Finally, we throw out all data that does not mark the beginning of a quarter, because we only have the beginnings of quarters in the other data set.
+
+unemployed <- unemployed %>%
+  filter(format(date, "%m-%d") %in% c("01-01", "04-01", "07-01", "10-01"))
+
+
+# And all data before October 2010 an after January 2024
+unemployed <- unemployed %>%
+  filter(date >= as.Date("2010-10-01")) %>% 
+  filter(date < as.Date("2024-04-01"))
+
+
+```
+
+# Theoretical assumptions and hypothesis
+
+Do some theoretical thoughts, for example:
+
+To keep it simple, I'm going to use the neoclassical labor market model as a guide. This is unrealistic and outdated (even if economists just don't want to give up on it), but depending on how the results turn out, we can still make a few statements.
+
+The assumptions of the neoclassical labor market model are as follows: 1. Anyone can do any job. 2. Everyone is geographically mobile. There are no barriers to employment, such as children or caring for relatives.
+
+I'm going to reject a third assumption of the model right away. The neoclassical model claims that there is no structural unemployment. If I were to accept that, I could save myself the trouble of analyzing it. Rather, we want to try to falsify this assumption. To do so, I put forward the following hypothesis.
+
+H1: There exist not enough jobs, which means that not all unemployed people can find work.
+
+# Evidence from the data
+
+Now move on to the data analysis. Since we have time series data, it makes sense to first display the data in a linear plot.
+
+```{r plot data, fig.path='figure-latex/'}
+sub_vacancies1 <- vacancies %>%
+  filter(date < as.Date("2022-01-01")) 
+sub_vacancies2 <- vacancies %>%
+  filter(date >= as.Date("2021-10-01")) 
+
+ggplot()+
+  geom_line(data = sub_vacancies1, aes(x = date, y = immediately, color = "vacancies to be filled immediately"))+
+  geom_line(data = sub_vacancies2, aes(x = date, y = immediately, color = "vacancies estiamted by IAB"))+
+  geom_line(data = unemployed, aes(x = date, y = total, color = "unemployed"))+
+  scale_y_continuous(breaks = seq(min(500), max(3000), by = 1000))+
+  scale_x_date(date_labels = "%Y", date_breaks = "2 years") +
+  scale_color_manual(values = c("vacancies to be filled immediately" = "blue", "vacancies estiamted by IAB" = "purple", "unemployed" = "red")) +
+    labs(color = "Legend", y = "absolute values in thousands", x= "year", title = "Trends of unemployment and vacancies in Germany", subtitle = "Data source: Bundesagentur für Arbeit and Institut für Arbeitsmarkt und Berufsforschung")+
+    theme_classic()
+# If you want save the plot use this: 
+# ggsave(filename = "vanacies and unemployment.png", plot = p, width = 10, height = 6,  dpi = 300 )
+# But first you must put the plot in a variable p <- ggplot...
+```
+
+As we can see the number of unemployed is much higher than the number of vacancies to be filled immediately at any time. The next step is to subtract the vacancies from the number of unemployed and thus calculate the missing jobs $\Delta$vacancies. But we choose only some dates to keep the table short. We will see the full table at the and in the appendix.
+
+Following our results in the table on the next side our null hypothesis can be rejected and H1 is supported. Neoclassical economists might argue the reason is thst the minimum wage is too high and therefore labour is too expensive. Unfortunately, however, employees have to pay rent and food from their wages. This makes the assumption that wages are flexible downwards without limit untenable. If, as in Germany, minimum full-time wages have to be topped up by the state with social benefits, the minimum wage is actually too low. Think about it!
+
+$\vspace{4cm}$
+
+```{r, fig.path='figure-latex/', tab.cap='table 1'}
+#Let´s see how much jobs are missed to put every unemployed into work.
+d <- select(unemployed, date)
+d$total <- unemployed$total
+d$vacancies <- vacancies$immediately
+d$delta_vacancies <- unemployed$total - vacancies$immediately
+
+
+d$date <- as.factor(d$date)
+      
+d_filtered <- d %>%
+  slice(c(1:2, 26:27, 49:53))
+      
+table1 <- gt(data = d_filtered) %>% 
+  cols_align(
+    align = "center",
+    columns = everything()) %>% 
+  cols_label(
+    date = "date",
+    delta_vacancies = "$\\Delta$ Vacancies") %>% 
+  tab_spanner(
+    label = "Calculation of missing jobs",
+    columns = everything()) %>% 
+   cols_width(
+    date ~ px(100),  
+    total ~ px(100),
+    vacancies ~ px(100),
+    delta_vacancies ~ px(100)) %>% 
+  tab_footnote(
+    footnote = "Values in thousands",
+    locations = cells_column_labels(
+      columns = c(delta_vacancies, total, vacancies))) %>% 
+   tab_footnote(
+    footnote = "From 2020 onwards, the calculation is based on estimates from the IAB",
+    locations = cells_column_labels(
+      columns = c(delta_vacancies)))
+
+table1
+
+# Save the table if you want
+# gtsave(table1, "gt_table.html")
+
+
+```
+
+Since the first hypothesis is supported by the data, the question arises as to whether unemployment is actually caused by too few available jobs. Let us calculate a linear model to ckeck it out.
+
+$\vspace{0.5cm}$
+
+```{r linear model, results='asis', fig.path='figure-latex/'}
+
+m1 <- lm(total ~ vacancies, data = d)
+stargazer(m1, type = "latex", title = "Regression Results", style =  "all2",
+          order = c("Constant", "vacancies"), header = FALSE)
+
+# save stargazer table as html:
+# stargazer(m1, type = "latex", title = "Regression Results", style =  "all2", order = c("Constant", "vacancies"), header = FALSE, out = "stargazer.html")
+
+# save the coefficient b1 as variable and calculate its absolute value.
+b1 <- m1$coefficients["vacancies"]
+bb <- round(b1 * -1, 4) 
+# save R^2 in a variable
+
+sum_m1  <- summary(m1)
+R2perc <- round(sum_m1$adj.r.squared, 1)*100
+```
+
+The regression model shows that the number of vacancies has a statistically significant negative impact on the total number. On average, each additional vacancy reduces the total number of unemployed by about `r bb` units. Around `r R2perc`% of the variability in unemployment can be explained by job vacancies. However, there is still a substantial amount of unexplained variability, suggesting that other factors may also influence the total. This could be due to qualification or regional mismatches. Commitments such as childcare could also be a factor. The regression results will be visualized in the next step to provide a more intuitive understanding of the relationship between vacancies. I also add the confidence intervals.
+
+$\vspace{0.5cm}$
+
+```{r}
+ggplot(d, aes(x = vacancies, y = total))+
+  geom_point()+
+  geom_smooth(method = "lm")+
+  labs(y = "unemployment", title = "linear regression model", subtitle = "unemployment ~ vacancies")+
+  theme_classic()
+    
+# If you want save the plot use this: 
+# ggsave(filename = "vanacies unemployment regression.png", plot = p2, width = 10, height = 6,  dpi = 300 )
+# But first you must put the plot in a variable p2 <- ggplot...
+```
+
+Were at the end now
+
+# Conclusion
+
+Next a little conclusion. For example: As we have seen, the idea that every unemployed person goes to work is unrealistic over the entire observation period, even if we assume that everyone is qualified for every job and is not subject to spatial restrictions. There is a huge gap between public discourse and reality.
+
+Instead of focusing on individuals, it would be better to push for an effective economic policy that creates new jobs - a policy that focuses on full employment. The effect would be, this much can be said at this point, that the unemployment rate would fall considerably as a result. Of course, the number of jobs is not the only problem. But it is one that could be addressed.
+
+# Appendix
+
+Here is the full table with all $\Delta$vacancies.
+
+$\vspace{0.5cm}$
+
+```{r, fig.path='figure-latex/'}
+#Let´s see how much jobs are missed to put every unemployed into work.
+d <- select(unemployed, date)
+d$total <- unemployed$total
+d$vacancies <- vacancies$immediately
+d$delta_vacancies <- unemployed$total - vacancies$immediately
+
+
+d$date <- as.factor(d$date)
+            
+table1full <- gt(data = d) %>% 
+  cols_align(
+    align = "center",
+    columns = everything()) %>% 
+  cols_label(
+    date = "date",
+    delta_vacancies = "$\\Delta$ Vacancies") %>% 
+  tab_spanner(
+    label = "Calculation of missing jobs",
+    columns = everything()) %>% 
+   cols_width(
+    date ~ px(100),  
+    total ~ px(100),
+    vacancies ~ px(100),
+    delta_vacancies ~ px(100)) %>% 
+  tab_footnote(
+    footnote = "Values in thousands",
+    locations = cells_column_labels(
+      columns = c(delta_vacancies, total, vacancies))) %>% 
+   tab_footnote(
+    footnote = "From 2020 onwards, the calculation is based on estimates from the IAB",
+    locations = cells_column_labels(
+      columns = c(delta_vacancies)))
+
+table1full
+
+```
