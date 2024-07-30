@@ -33,7 +33,7 @@ library(tidyverse)
 library(gt)
 library(stargazer)
 ###### Don`t forgett to set your working directory. replace "\" in your path with "/".
-setwd("Your directory path /Vacancies and structural Unemployment")
+setwd(" path to your directory /Upload/Vacancies and structural Unemployment")
 
 # link to the data about vacancies: https://www.iab.de/stellenerhebung/download
 vacancies <- read_excel("datasets/IAB-Stellenerhebung_Indikatoren.xlsx", sheet = "2")
@@ -200,12 +200,13 @@ $\vspace{0.5cm}$
 ```{r}
 ggplot(d, aes(x = vacancies, y = total))+
   geom_point()+
-  geom_smooth(method = "lm")+
+  geom_smooth(method = "lm", formula = y ~ x)+
   labs(y = "unemployment", title = "linear regression model", subtitle = "unemployment ~ vacancies")+
+  labs(x = "vacancies in thousands", y = "vacancies in thousands")+
   theme_classic()
     
 # If you want save the plot use this: 
-# ggsave(filename = "vanacies unemployment regression.png", plot = p2, width = 10, height = 6,  dpi = 300 )
+#ggsave(filename = "vanacies unemployment regression.png", plot = p2, width = 10, height = 6,  dpi = 300 )
 # But first you must put the plot in a variable p2 <- ggplot...
 ```
 
